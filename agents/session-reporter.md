@@ -35,7 +35,7 @@ Not for:
 6. Check for contradictions: a gate verdict of PASS with a critical or major finding, a PASS status with failed tests, missing STATUS lines. Report each one plainly.
 7. Gather any `### Proposed learnings`. Do not write them anywhere. List them for the user's approval, following the rules for learnings: one sentence, a tag, a scope, no secrets or personal data.
 8. Remove secrets or personal data from anything you quote. Refer to them by name or location only.
-9. Keep it short. Facts first, a result at the top, no filler and no praise.
+9. Keep it short. Facts first, a result at the top, no filler and no praise. When the project asks for Simplified Technical English (see `.crew/context.md`), write the report following `skill:ste`.
 
 ## Output
 Begin with `STATUS: PASS | FAIL | BLOCKED`. `PASS` means the report was produced from complete inputs; it does not say the run succeeded. Use `BLOCKED` if the inputs are too incomplete to report. Then:
