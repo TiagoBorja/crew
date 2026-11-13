@@ -186,7 +186,8 @@ if [ "$want_all" = 1 ]; then
 fi
 
 if [ -n "$msg_file" ]; then
-    scan "$msg_file" 0 < "$msg_file"
+    msg_name=$msg_file
+    scan "$msg_name" 0 < "$msg_file"
 fi
 
 if [ "$want_history" = 1 ]; then

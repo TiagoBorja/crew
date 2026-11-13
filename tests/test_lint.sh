@@ -10,7 +10,7 @@ fx=$here/fixtures
 
 W=$(mktemp -d "${TMPDIR:-/tmp}/crew-t-lint.XXXXXX")
 trap 'rm -rf "$W"' EXIT
-export HOME=$W/home
+export HOME="$W/home"
 mkdir -p "$HOME"
 
 n=0

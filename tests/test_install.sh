@@ -9,7 +9,7 @@ repo=$(cd "$here/.." && pwd)
 
 W=$(mktemp -d "${TMPDIR:-/tmp}/crew-t-install.XXXXXX")
 trap 'rm -rf "$W"' EXIT
-export HOME=$W/home
+export HOME="$W/home"
 mkdir -p "$HOME"
 S=$W/src
 cp -R "$here/fixtures/good" "$S"
@@ -41,10 +41,13 @@ digest() { # dir : content digest of every file below dir
     done)
 }
 
+# shellcheck disable=SC2329 # called indirectly through check
 only_skips() { ! grep -qv '^skip ' "$W/out"; }
+# shellcheck disable=SC2329 # called indirectly through check
 has_all() { # file... : all exist
     for f in "$@"; do [ -e "$f" ] || { echo "missing: $f" >&2; return 1; }; done
 }
+# shellcheck disable=SC2329 # called indirectly through check
 same_file() { cmp -s "$1" "$2"; }
 
 # ---- global install, all targets --------------------------------------------
@@ -120,6 +123,7 @@ cp "$HOME/.codex/AGENTS.md" "$W/o.agents"
 cp "$HOME/.codex/config.toml" "$W/o.toml"
 inst --global
 check "install next to user content exits 0" test "$rc" = 0
+# shellcheck disable=SC2329 # called indirectly through check
 head_matches() { # original installed
     sz=$(wc -c < "$1" | tr -d ' ')
     head -c "$sz" "$2" | cmp -s - "$1"
