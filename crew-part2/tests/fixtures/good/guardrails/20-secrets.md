@@ -1,3 +1,0 @@
-# Secrets
-
-Never print secrets.

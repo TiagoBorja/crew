@@ -1,3 +1,0 @@
-# Bad name
-
-x

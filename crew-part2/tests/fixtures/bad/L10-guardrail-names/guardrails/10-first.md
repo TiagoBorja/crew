@@ -1,3 +1,0 @@
-# Duplicate number
-
-x
