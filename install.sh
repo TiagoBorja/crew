@@ -300,7 +300,9 @@ tier_model() { # tier
 contract_text() { # gate reads_only
     printf '%s\n' '## Contract'
     printf '%s\n' 'Follow the crew guardrails in ~/.crew/guardrails.md.'
+    # shellcheck disable=SC2016 # backticks are literal text in the output
     printf '%s\n' 'Start your final message with `STATUS: PASS|FAIL|BLOCKED`.'
+    # shellcheck disable=SC2016 # backticks are literal text in the output
     if [ "$1" = true ]; then printf '%s\n' 'End with `VERDICT: PASS|FAIL` and at least one reason line.'; fi
     if [ "$2" = true ]; then printf '%s\n' 'You must not modify files.'; fi
 }
@@ -344,6 +346,7 @@ render_prompt() { # source-file out
         printf 'description: %s\n' "$(yaml_scalar "$(fm_get "$1" description)")"
         if [ -n "$rp_hint" ]; then printf 'argument-hint: %s\n' "$(yaml_scalar "$rp_hint")"; fi
         printf '%s\n' '---'
+        # shellcheck disable=SC2016 # backticks are literal text in the output
         printf 'Act as the `%s` agent.\n\n' "$rp_agent"
         fm_body "$1"
     } > "$2"
@@ -366,7 +369,7 @@ put_file() { # dest content scope target [link-source]
     pf_link=${5:-}
     pf_new=$(sha_of "$pf_src")
     pf_mode=copy
-    if [ "$LINK" = 1 ] && [ -n "$pf_link" ] && cmp -s "$pf_src" "$pf_link"; then pf_mode=link; fi
+    if [ "$LINK" = 1 ] && [ -n "$pf_link" ] && cmp -s "$pf_src" "$pf_link"; then pf_mode="link"; fi
 
     if [ ! -e "$pf_dest" ] && [ ! -L "$pf_dest" ]; then
         act create "$pf_dest"
@@ -376,7 +379,7 @@ put_file() { # dest content scope target [link-source]
     fi
     pf_cur=$(sha_of "$pf_dest" 2>/dev/null) || pf_cur=
     pf_isln=copy
-    if [ -L "$pf_dest" ]; then pf_isln=link; fi
+    if [ -L "$pf_dest" ]; then pf_isln="link"; fi
     pf_old=$(mf "$(man_line "$pf_dest")" sha256)
     if [ "$pf_cur" = "$pf_new" ] && [ "$pf_isln" = "$pf_mode" ]; then
         act skip "$pf_dest"
@@ -715,9 +718,13 @@ build_contents() {
         printf '\n'
         cat "$TMP/guardrails.md"
         printf '\n'
+        # shellcheck disable=SC2016 # backticks are literal text in the output
         printf '%s\n' '- Project context: `.crew/context.md` (read first when present)'
+        # shellcheck disable=SC2016 # backticks are literal text in the output
         printf '%s\n' '- Project learnings: `.crew/learnings.md`'
+        # shellcheck disable=SC2016 # backticks are literal text in the output
         printf '%s\n' '- Personal learnings: `~/.crew/learnings.md`'
+        # shellcheck disable=SC2016 # backticks are literal text in the output
         printf '%s\n' '- Agent definitions: `.crew/agents/` (project) or `~/.crew/agents/`'
     } > "$TMP/codex.block"
     bsz=$(wc -c < "$TMP/codex.block" | tr -d ' ')

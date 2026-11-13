@@ -1,0 +1,19 @@
+# local deny list of terms: keep it out of the repository
+.crew/denylist
+
+# common secret files
+.env
+.env.*
+*.pem
+*.key
+
+# editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# scratch
+tmp/
+scratch/

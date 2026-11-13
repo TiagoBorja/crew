@@ -9,7 +9,7 @@ crew=$repo/bin/crew
 
 W=$(mktemp -d "${TMPDIR:-/tmp}/crew-t-run.XXXXXX")
 trap 'rm -rf "$W"' EXIT
-export HOME=$W/home
+export HOME="$W/home"
 mkdir -p "$HOME" "$W/proj" "$W/stubs"
 unset CREW_HOME
 S=$W/src
@@ -21,7 +21,9 @@ failed=0
 ok() { n=$((n + 1)); echo "ok $n - $1"; }
 nok() { n=$((n + 1)); failed=1; echo "not ok $n - $1"; }
 check() { d=$1; shift; if "$@"; then ok "$d"; else nok "$d"; fi; }
+# shellcheck disable=SC2329 # called indirectly through check
 has() { grep -q -- "$2" "$1"; }
+# shellcheck disable=SC2329 # called indirectly through check
 hasnt() { ! grep -q -- "$2" "$1"; }
 
 CREW_SRC=$S sh "$repo/install.sh" --global > "$W/inst.out" 2>&1 || { cat "$W/inst.out"; echo "Bail out! install failed"; exit 1; }
@@ -37,7 +39,7 @@ exit "${STUB_RC:-0}"
 EOF
     chmod +x "$W/stubs/$e"
 done
-export STUB_LOG=$W/stub STUB_OUT=$W/stub.out
+export STUB_LOG="$W/stub" STUB_OUT="$W/stub.out"
 PATH=$W/stubs:$PATH
 
 run() { # args... : runs crew, sets rc, output in $W/out and $W/err
@@ -132,6 +134,7 @@ check "STATUS: BLOCKED -> 3" test "$rc" = 3
 say 'no status here'
 run run alpha-worker "do it"
 check "no STATUS line -> 4" test "$rc" = 4
+# shellcheck disable=SC2016 # backticks are literal text in the stub output
 say 'Start your final message with `STATUS: PASS|FAIL|BLOCKED`.'
 run run alpha-worker "do it"
 check "the contract text itself is not a STATUS line -> 4" test "$rc" = 4

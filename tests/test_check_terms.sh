@@ -8,7 +8,7 @@ real=$repo/scripts/check-terms.sh
 
 W=$(mktemp -d "${TMPDIR:-/tmp}/crew-t-ct.XXXXXX")
 trap 'rm -rf "$W"' EXIT
-export HOME=$W/home
+export HOME="$W/home"
 mkdir -p "$HOME"
 export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_NOSYSTEM=1
@@ -51,7 +51,7 @@ expect_rc "--encode is gone" 2 sh "$copy" --encode
 echo "hello acmesecret" > a.txt
 git add a.txt
 expect_rc "no list: only secret patterns run" 0 env -u CREW_DENYLIST_FILE sh "$copy" --staged
-grep -q 'no term list' "$W/err" && ok "no list is reported" || nok "no list is reported"
+if grep -q 'no term list' "$W/err"; then ok "no list is reported"; else nok "no list is reported"; fi
 mkdir -p "$HOME/.crew"
 cp "$W/list" "$HOME/.crew/denylist"
 expect_rc "default list in ~/.crew/denylist is used" 1 env -u CREW_DENYLIST_FILE sh "$copy" --staged
@@ -92,7 +92,7 @@ mkdir sub
 echo ok > sub/acmesecret.txt
 git add sub
 expect_rc "staged path name hit" 1 sh "$copy" --staged
-grep -q '^sub/acmesecret.txt:0: term-id 1$' "$W/out" && ok "path hit reported at line 0" || nok "path hit reported at line 0"
+if grep -q '^sub/acmesecret.txt:0: term-id 1$' "$W/out"; then ok "path hit reported at line 0"; else nok "path hit reported at line 0"; fi
 git rm -q -f --cached sub/acmesecret.txt
 rm -rf sub
 
@@ -133,14 +133,14 @@ printf 'Add feature\n\nbody text\n' > "$W/m1"
 printf 'Add feature for ACMESECRET\n' > "$W/m2"
 expect_rc "clean message passes" 0 sh "$copy" --message "$W/m1"
 expect_rc "message hit" 1 sh "$copy" --message "$W/m2"
-grep -q "^$W/m2:1: term-id 1\$" "$W/out" && ok "message hit line format" || nok "message hit line format"
+if grep -q "^$W/m2:1: term-id 1\$" "$W/out"; then ok "message hit line format"; else nok "message hit line format"; fi
 
 # --- history mode: message, author and committer ---
 echo more >> a.txt
 git add a.txt
 git commit -q -m "mention acmesecret here"
 expect_rc "history catches commit message" 1 sh "$copy" --history
-grep -q ':message:1: term-id 1$' "$W/out" && ok "history message label" || nok "history message label"
+if grep -q ':message:1: term-id 1$' "$W/out"; then ok "history message label"; else nok "history message label"; fi
 expect_rc "--all alone ignores history" 0 sh "$copy" --all
 git commit -q --amend -m "neutral message"
 expect_rc "history clean after amend" 0 sh "$copy" --history
@@ -148,7 +148,7 @@ echo more >> a.txt
 git add a.txt
 git -c user.email=someone@acmesecret.example.com commit -q -m "identity test"
 expect_rc "history catches author email" 1 sh "$copy" --history
-grep -q ':author-email:1: term-id 1$' "$W/out" && ok "history author-email label" || nok "history author-email label"
+if grep -q ':author-email:1: term-id 1$' "$W/out"; then ok "history author-email label"; else nok "history author-email label"; fi
 git reset -q --hard HEAD~1
 expect_rc "history clean after reset" 0 sh "$copy" --history
 
