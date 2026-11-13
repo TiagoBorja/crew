@@ -6,6 +6,7 @@ The format follows Keep a Changelog; versions follow semantic versioning.
 ## [Unreleased]
 
 ### Added
+- `ste` skill: house rules for Simplified Technical English; the docs, code-reviewer and session-reporter agents use it.
 - Cost routing: the orchestrator sends each stage to the cheapest tier that fits, escalates one tier on a weak result and never lowers a gate.
 - `crew run --tier fast|standard|deep` and an optional `tier:` key in the HANDOFF block.
 

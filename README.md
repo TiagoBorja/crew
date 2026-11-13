@@ -1,7 +1,7 @@
 # crew
 
 crew is a personal, project-agnostic multi-agent framework for AI coding
-tools. It ships 39 role-based agents, 17 skills and 6 entry prompts, written
+tools. It ships 39 role-based agents, 18 skills and 6 entry prompts, written
 once as neutral markdown and rendered by `install.sh` into the native formats
 of Claude Code and Codex CLI. Any other tool that reads `AGENTS.md` can use the
 same roles inline. Agents are stack-neutral; project facts live in
@@ -190,7 +190,8 @@ Tiers (fast, standard, deep) map to models, see Configuration. Gates return a
 Skills: `adr`, `api-design`, `code-review-checklist`, `database-migrations`,
 `debugging`, `deep-research`, `docker`, `e2e-testing`, `git-workflow`,
 `lang-java`, `lang-python`, `lang-typescript`, `planning-blueprint`,
-`search-first`, `security-checklist`, `tdd-workflow`, `verification-loop`.
+`search-first`, `security-checklist`, `ste`, `tdd-workflow`,
+`verification-loop`.
 
 Prompts:
 

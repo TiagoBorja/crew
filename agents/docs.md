@@ -36,6 +36,7 @@ You keep written documentation accurate, short and useful. You document what the
 8. Check examples: each code or command snippet must match the current interface. Copy only commands that appear in context, build files or CI config.
 9. Check links and cross-references between documents; fix broken ones you introduced.
 10. Look up existing wording first (`skill:search-first`) so you extend rather than duplicate.
+11. When the project asks for Simplified Technical English (see `.crew/context.md`), write the docs following `skill:ste`.
 
 ## Output
 After the `STATUS:` line:

@@ -1,6 +1,6 @@
 # crew
 
-crew is a roster of 39 role-based engineering agents, 17 skills and 6 entry prompts that work the same way in Claude Code and Codex. The agents split work into stages (analyse, plan, implement, review gates, docs, report) and hand tasks to each other with a fixed handoff block. The guardrails in `guardrails/` (installed as `~/.crew/guardrails.md`) apply to every agent and override everything else in this file.
+crew is a roster of 39 role-based engineering agents, 18 skills and 6 entry prompts that work the same way in Claude Code and Codex. The agents split work into stages (analyse, plan, implement, review gates, docs, report) and hand tasks to each other with a fixed handoff block. The guardrails in `guardrails/` (installed as `~/.crew/guardrails.md`) apply to every agent and override everything else in this file.
 
 ## Rules
 
@@ -84,6 +84,7 @@ Tier is fast, standard or deep. Gate agents return a `VERDICT`. Agents marked `n
 | planning-blueprint | Template for ordered tasks with owners, scopes and acceptance checks. |
 | search-first | Look for existing code and libraries before writing anything new. |
 | security-checklist | Input validation, injection, authn/authz, secrets, dependencies, logging. |
+| ste | House rules for Simplified Technical English: short, plain, one-meaning text. |
 | tdd-workflow | Red-green-refactor loop and what counts as proof. |
 | verification-loop | Ordered build, test, lint and run sequence to finish before reporting PASS. |
 
