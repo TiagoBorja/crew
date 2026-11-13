@@ -1,0 +1,12 @@
+#!/bin/sh
+# pre-commit: scan staged changes for secrets and denied terms, then lint.
+# Enable once per clone: git config core.hooksPath .githooks
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+sh scripts/check-terms.sh --staged
+if [ -f scripts/lint.sh ]; then
+    sh scripts/lint.sh
+fi

@@ -1,0 +1,16 @@
+# crew configuration. Plain KEY=VALUE lines, never executed.
+# Models used when rendering Claude Code agents, per tier.
+CLAUDE_MODEL_FAST=haiku
+CLAUDE_MODEL_STANDARD=sonnet
+CLAUDE_MODEL_DEEP=opus
+# Codex models per tier. Empty means: let Codex pick its own default.
+CODEX_MODEL_FAST=
+CODEX_MODEL_STANDARD=
+CODEX_MODEL_DEEP=
+CODEX_EFFORT_FAST=low
+CODEX_EFFORT_STANDARD=medium
+CODEX_EFFORT_DEEP=high
+# Which tools the installer targets by default: claude | codex | all
+DEFAULT_TARGET=all
+# Engine used by "crew run": codex | claude
+RUN_ENGINE=codex
