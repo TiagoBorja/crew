@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Lint
+        run: sh scripts/lint.sh
+      - name: Check terms
+        run: sh scripts/check-terms.sh --all
+      - name: Tests
+        run: sh tests/run.sh
+      # tests/shellcheck.sh skips itself when shellcheck is not installed
+      - name: Shellcheck
+        run: sh tests/shellcheck.sh

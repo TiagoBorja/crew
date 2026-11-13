@@ -1,0 +1,13 @@
+# crew:begin
+[profiles.crew-fast]
+model_reasoning_effort = "low"
+
+[profiles.crew-standard]
+model_reasoning_effort = "medium"
+
+[profiles.crew-deep]
+model_reasoning_effort = "high"
+
+[profiles.crew-readonly]
+sandbox_mode = "read-only"
+# crew:end

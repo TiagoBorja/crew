@@ -1,0 +1,8 @@
+#!/bin/sh
+# commit-msg: scan the commit message for secrets and denied terms.
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+sh scripts/check-terms.sh --message "$1"
