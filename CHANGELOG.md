@@ -10,6 +10,9 @@ The format follows Keep a Changelog; versions follow semantic versioning.
 - Cost routing: the orchestrator sends each stage to the cheapest tier that fits, escalates one tier on a weak result and never lowers a gate.
 - `crew run --tier fast|standard|deep` and an optional `tier:` key in the HANDOFF block.
 
+### Fixed
+- `ac-checker`: proves a merge in another repository with `origin/main`, not with a working tree or `git branch --contains`.
+
 ## [0.1.0]
 
 ### Added
