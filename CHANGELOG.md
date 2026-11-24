@@ -13,7 +13,7 @@ The format follows Keep a Changelog; versions follow semantic versioning.
 - `crew run --engine copilot`, `COPILOT_MODEL_FAST|STANDARD|DEEP` config keys and a `copilot` check in `crew doctor`.
 
 ### Known limitations
-- The Copilot integration is not yet verified against the real tools: the `tools` alias list in custom agents, whether text after `/crew-<name>` reaches the skill, and `copilot -s --no-ask-user --allow-all-tools --deny-tool`.
+- Copilot CLI 1.0.99 was checked by hand with a separate `COPILOT_HOME`: it loads the rendered agents and `crew-<name>` skills, `--agent <name>` works, and `crew run --engine copilot` ran a worker (STATUS PASS, tests green) and a read-only gate (VERDICT, no file written). Not yet checked: whether text typed after `/crew-<name>` reaches the skill, and the Copilot app.
 - The manifest tracks one global Copilot home; installing again with another `COPILOT_HOME` removes the files from the old home.
 
 ### Fixed
