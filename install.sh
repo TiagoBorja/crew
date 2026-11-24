@@ -1,7 +1,7 @@
 #!/bin/sh
-# install.sh - renders crew content for Claude Code and Codex.
+# install.sh - renders crew content for Claude Code, Codex and GitHub Copilot.
 #
-# Usage: install.sh [--global | --project [DIR]] [--target claude|codex|all]
+# Usage: install.sh [--global | --project [DIR]] [--target claude|codex|copilot|all]
 #                   [--dry-run] [--update] [--uninstall] [--link] [--help]
 #
 # POSIX sh + awk only. No network. Reads the crew source tree next to this
@@ -28,7 +28,7 @@ Usage: install.sh [options]
 
   --global             install to user-level paths (default)
   --project [DIR]      install to project DIR (default: current directory)
-  --target T           claude | codex | all (default: DEFAULT_TARGET in ~/.crew/config, else all)
+  --target T           claude | codex | copilot | all (default: DEFAULT_TARGET in ~/.crew/config, else all)
   --dry-run            print every planned action, write nothing
   --update             re-render; keep edited files; remove files that left the source
   --uninstall          remove crew files and managed blocks listed in the manifest
@@ -80,8 +80,8 @@ done
 if [ "$GFLAG" = 1 ] && [ "$PFLAG" = 1 ]; then die 2 "--global and --project are mutually exclusive"; fi
 if [ "$PFLAG" = 1 ]; then SCOPE=project; fi
 case $TARGET in
-    "" | claude | codex | all) ;;
-    *) die 2 "invalid --target '$TARGET' (claude, codex or all)" ;;
+    "" | claude | codex | copilot | all) ;;
+    *) die 2 "invalid --target '$TARGET' (claude, codex, copilot or all)" ;;
 esac
 
 # ---- environment ------------------------------------------------------------
@@ -104,6 +104,12 @@ case $HOME in
 esac
 [ -d "$HOME" ] || die 2 "HOME is not a directory: $HOME"
 [ -d "$SRC" ] || die 2 "source is not a directory: $SRC"
+COPILOT_HOME=${COPILOT_HOME:-$HOME/.copilot}
+case $COPILOT_HOME in
+    /*) ;;
+    *) die 2 "COPILOT_HOME must be an absolute path" ;;
+esac
+COPILOT_HOME=${COPILOT_HOME%/}
 SRC=$(cd "$SRC" && pwd)
 
 if [ "$SCOPE" = project ]; then
@@ -111,7 +117,7 @@ if [ "$SCOPE" = project ]; then
     [ -d "$PROJ" ] || die 2 "project directory does not exist: $PROJ"
     PROJ=$(cd "$PROJ" && pwd -P)
 fi
-for p in "$HOME" "$PROJ"; do
+for p in "$HOME" "$PROJ" "$COPILOT_HOME"; do
     case $p in
         *\"* | *\\*) die 2 "paths containing quotes or backslashes are not supported: $p" ;;
     esac
@@ -125,11 +131,15 @@ if [ "$SCOPE" = global ]; then
     CLAUDE_DIR=$HOME/.claude
     CLAUDE_MD=$HOME/.claude/CLAUDE.md
     CODEX_MD=$HOME/.codex/AGENTS.md
+    COPILOT_DIR=$COPILOT_HOME
+    COPILOT_MD=$COPILOT_HOME/copilot-instructions.md
 else
     SCOPE_ID=project:$PROJ
     CLAUDE_DIR=$PROJ/.claude
     CLAUDE_MD=$PROJ/CLAUDE.md
     CODEX_MD=$PROJ/AGENTS.md
+    COPILOT_DIR=$PROJ/.github
+    COPILOT_MD=$PROJ/.github/copilot-instructions.md
 fi
 
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/crewinst.XXXXXX")
@@ -178,7 +188,7 @@ keep_old() { # path : conflict leaves the previous manifest entry alone
 
 prune_dirs() { # path : remove emptied parent directories below HOME/PROJ
     pd=${1%/*}
-    while [ -n "$pd" ] && [ "$pd" != "$HOME" ] && [ "$pd" != "$PROJ" ] && [ "$pd" != / ]; do
+    while [ -n "$pd" ] && [ "$pd" != "$HOME" ] && [ "$pd" != "$PROJ" ] && [ "$pd" != "$COPILOT_HOME" ] && [ "$pd" != / ]; do
         rmdir "$pd" 2>/dev/null || break
         pd=${pd%/*}
     done
@@ -219,7 +229,7 @@ cfg_opt() { # key : validated value, may be empty
 warn_unknown_keys() {
     [ -f "$CFG" ] || return 0
     awk '
-        BEGIN { n = split("CLAUDE_MODEL_FAST CLAUDE_MODEL_STANDARD CLAUDE_MODEL_DEEP CODEX_MODEL_FAST CODEX_MODEL_STANDARD CODEX_MODEL_DEEP CODEX_EFFORT_FAST CODEX_EFFORT_STANDARD CODEX_EFFORT_DEEP DEFAULT_TARGET RUN_ENGINE", a, " ")
+        BEGIN { n = split("CLAUDE_MODEL_FAST CLAUDE_MODEL_STANDARD CLAUDE_MODEL_DEEP CODEX_MODEL_FAST CODEX_MODEL_STANDARD CODEX_MODEL_DEEP CODEX_EFFORT_FAST CODEX_EFFORT_STANDARD CODEX_EFFORT_DEEP COPILOT_MODEL_FAST COPILOT_MODEL_STANDARD COPILOT_MODEL_DEEP DEFAULT_TARGET RUN_ENGINE", a, " ")
                 for (i = 1; i <= n; i++) known[a[i]] = 1 }
         /^[ \t]*#/ || /^[ \t]*$/ { next }
         { i = index($0, "="); key = (i ? substr($0, 1, i - 1) : $0); gsub(/[ \t]/, "", key)
@@ -240,9 +250,13 @@ CODEX_MODEL_DEEP=
 CODEX_EFFORT_FAST=low
 CODEX_EFFORT_STANDARD=medium
 CODEX_EFFORT_DEEP=high
-# Which tools the installer targets by default: claude | codex | all
+# GitHub Copilot models per tier. Empty means: inherit the session model.
+COPILOT_MODEL_FAST=
+COPILOT_MODEL_STANDARD=
+COPILOT_MODEL_DEEP=
+# Which tools the installer targets by default: claude | codex | copilot | all
 DEFAULT_TARGET=all
-# Engine used by "crew run": codex | claude
+# Engine used by "crew run": codex | claude | copilot
 RUN_ENGINE=codex
 EOF
 }
@@ -334,6 +348,68 @@ render_neutral_agent() { # source-file out
         cat "$1"
         printf '\n'
         contract_text "$(fm_get "$1" gate)" "$(fm_get "$1" reads_only)"
+    } > "$2"
+}
+
+map_tools_copilot() { # name capabilities reads_only : YAML flow list of Copilot tool aliases
+    awk -v name="$1" -v caps="$2" -v ro="$3" '
+        BEGIN { gsub(/[\[\],]/, " ", caps); n = split(caps, c, " "); for (i = 1; i <= n; i++) has[c[i]] = 1
+                split("read:read search:search edit:edit shell:execute web:web", m, " ")
+                for (i = 1; i <= 5; i++) {
+                    split(m[i], kv, ":")
+                    if (!(kv[1] in has)) continue
+                    if (ro == "true" && kv[2] == "edit") continue
+                    out = out (out == "" ? "" : ", ") "\"" kv[2] "\"" }
+                # the orchestrator delegates to the other crew agents
+                if (name == "orchestrator") out = out ", \"agent\""
+                print "[" out "]" }'
+}
+
+copilot_model() { # tier
+    case $1 in
+        fast) printf '%s\n' "$CP_FAST" ;;
+        standard) printf '%s\n' "$CP_STD" ;;
+        *) printf '%s\n' "$CP_DEEP" ;;
+    esac
+}
+
+render_copilot_agent() { # source-file out
+    rc_name=$(fm_get "$1" name)
+    rc_caps=$(fm_get "$1" capabilities)
+    rc_ro=$(fm_get "$1" reads_only)
+    rc_model=$(copilot_model "$(fm_get "$1" tier)")
+    rc_omit=0
+    case $rc_caps in
+        *mcp*) if [ "$rc_ro" != true ]; then rc_omit=1; fi ;;
+    esac
+    {
+        printf '%s\n' '---'
+        printf 'name: %s\n' "$rc_name"
+        printf 'description: %s\n' "$(yaml_scalar "$(fm_get "$1" description)")"
+        if [ "$rc_omit" = 0 ]; then printf 'tools: %s\n' "$(map_tools_copilot "$rc_name" "$rc_caps" "$rc_ro")"; fi
+        if [ -n "$rc_model" ]; then printf 'model: %s\n' "$rc_model"; fi
+        printf '%s\n' '---'
+        printf '<!-- generated by crew %s from agents/%s.md; do not edit -->\n' "$VERSION" "$rc_name"
+        fm_body "$1"
+        printf '\n'
+        contract_text "$(fm_get "$1" gate)" "$rc_ro"
+    } > "$2"
+}
+
+render_copilot_prompt() { # source-file out : an entry prompt as a crew-<name> skill
+    rq_name=$(fm_get "$1" name)
+    rq_agent=$(fm_get "$1" agent)
+    [ -n "$rq_agent" ] || rq_agent=orchestrator
+    {
+        printf '%s\n' '---'
+        printf 'name: crew-%s\n' "$rq_name"
+        printf 'description: %s\n' "$(yaml_scalar "$(fm_get "$1" description)")"
+        printf '%s\n' '---'
+        printf '<!-- generated by crew %s from prompts/%s.md; do not edit -->\n' "$VERSION" "$rq_name"
+        # shellcheck disable=SC2016 # backticks are literal text in the output
+        printf 'Act as the `%s` agent.\n\n' "$rq_agent"
+        fm_body "$1" | awk -v r="the text the user gave with /crew-$rq_name (or, when empty, the latest request in the conversation)" '
+            { gsub(/\$ARGUMENTS/, r); print }'
     } > "$2"
 }
 
@@ -696,6 +772,9 @@ load_config() {
     CX_EFAST=$(cfg_val CODEX_EFFORT_FAST low)
     CX_ESTD=$(cfg_val CODEX_EFFORT_STANDARD medium)
     CX_EDEEP=$(cfg_val CODEX_EFFORT_DEEP high)
+    CP_FAST=$(cfg_opt COPILOT_MODEL_FAST)
+    CP_STD=$(cfg_opt COPILOT_MODEL_STANDARD)
+    CP_DEEP=$(cfg_opt COPILOT_MODEL_DEEP)
     warn_unknown_keys
 }
 
@@ -729,6 +808,11 @@ build_contents() {
     } > "$TMP/codex.block"
     bsz=$(wc -c < "$TMP/codex.block" | tr -d ' ')
     if [ "$bsz" -ge 32768 ]; then die 5 "Codex AGENTS.md block is $bsz bytes (limit < 32768); nothing written"; fi
+    {
+        cat "$TMP/codex.block"
+        # shellcheck disable=SC2016 # backticks are literal text in the output
+        printf '%s\n' '- GitHub Copilot: crew agents are custom agents (`/agent`, or delegate to them by name); entry prompts are the `crew-<name>` skills'
+    } > "$TMP/copilot.block"
     printf '%s\n' "$VERSION" > "$TMP/version"
     printf '# Learnings\n' > "$TMP/learnings"
     codex_profiles > "$TMP/codex.toml"
@@ -787,12 +871,20 @@ install_skills() { # destroot scope target
     done
 }
 
-install_agents() { # destdir scope target neutral|claude
+install_agents() { # destdir scope target neutral|claude|copilot
     for f in "$SRC"/agents/*.md; do
         [ -f "$f" ] || continue
         next_tmp
-        if [ "$4" = claude ]; then render_claude_agent "$f" "$NT"; else render_neutral_agent "$f" "$NT"; fi
-        put_file "$1/${f##*/}" "$NT" "$2" "$3"
+        ia_dest=$1/${f##*/}
+        case $4 in
+            claude) render_claude_agent "$f" "$NT" ;;
+            copilot)
+                render_copilot_agent "$f" "$NT"
+                ia_dest=${ia_dest%.md}.agent.md
+                ;;
+            *) render_neutral_agent "$f" "$NT" ;;
+        esac
+        put_file "$ia_dest" "$NT" "$2" "$3"
         rm -f "$NT"
     done
 }
@@ -803,6 +895,17 @@ install_prompts() { # destdir scope target
         next_tmp
         render_prompt "$f" "$NT"
         put_file "$1/${f##*/}" "$NT" "$2" "$3"
+        rm -f "$NT"
+    done
+}
+
+install_copilot_prompts() { # skills-dir scope target
+    for f in "$SRC"/prompts/*.md; do
+        [ -f "$f" ] || continue
+        next_tmp
+        render_copilot_prompt "$f" "$NT"
+        ip_name=${f##*/}
+        put_file "$1/crew-${ip_name%.md}/SKILL.md" "$NT" "$2" "$3"
         rm -f "$NT"
     done
 }
@@ -836,6 +939,13 @@ install_codex() {
     fi
 }
 
+install_copilot() {
+    install_agents "$COPILOT_DIR/agents" "$SCOPE_ID" copilot copilot
+    install_skills "$COPILOT_DIR/skills" "$SCOPE_ID" copilot
+    install_copilot_prompts "$COPILOT_DIR/skills" "$SCOPE_ID" copilot
+    put_block "$COPILOT_MD" "$TMP/copilot.block" "$SCOPE_ID" copilot md
+}
+
 do_install() {
     read_version
     load_config
@@ -844,10 +954,12 @@ do_install() {
     DOMAINS=" global|core "
     case $TARGET in claude | all) DOMAINS="$DOMAINS$SCOPE_ID|claude " ;; esac
     case $TARGET in codex | all) DOMAINS="$DOMAINS$SCOPE_ID|codex " ;; esac
+    case $TARGET in copilot | all) DOMAINS="$DOMAINS$SCOPE_ID|copilot " ;; esac
     load_manifest
     install_core
     case $TARGET in claude | all) install_claude ;; esac
     case $TARGET in codex | all) install_codex ;; esac
+    case $TARGET in copilot | all) install_copilot ;; esac
     if [ "$SCOPE" = project ]; then
         context_template > "$TMP/context.md"
         put_once "$PROJ/.crew/context.md" "$TMP/context.md"
@@ -864,6 +976,12 @@ print_hints() {
         case $TARGET in
             codex | all) echo "hint: Codex profiles, prompts and skills are global: run install.sh --global --target codex" >&2 ;;
         esac
+        case $TARGET in
+            copilot | all) echo "hint: .github/agents/ and .github/skills/ hold rendered crew files; commit them to share crew with Copilot on GitHub, or ignore them" >&2 ;;
+        esac
+        case $TARGET in
+            all) echo "hint: Copilot also reads AGENTS.md, so the crew rules load twice in this project; use --target copilot alone if you only use Copilot here" >&2 ;;
+        esac
     fi
     echo "crew $VERSION installed ($SCOPE_ID, target $TARGET)" >&2
 }
@@ -873,6 +991,7 @@ do_uninstall() {
     DOMAINS=" "
     case $TARGET in claude | all) DOMAINS="$DOMAINS$SCOPE_ID|claude " ;; esac
     case $TARGET in codex | all) DOMAINS="$DOMAINS$SCOPE_ID|codex " ;; esac
+    case $TARGET in copilot | all) DOMAINS="$DOMAINS$SCOPE_ID|copilot " ;; esac
     if [ "$SCOPE" = global ] && [ "$TARGET" = all ]; then DOMAINS="${DOMAINS}global|core "; fi
     load_manifest
     if [ ! -s "$OLDMAN" ]; then
@@ -885,7 +1004,7 @@ do_uninstall() {
 
 [ -n "$TARGET" ] || TARGET=$(cfg_get DEFAULT_TARGET all)
 case $TARGET in
-    claude | codex | all) ;;
+    claude | codex | copilot | all) ;;
     *) die 2 "invalid DEFAULT_TARGET '$TARGET' in $CFG" ;;
 esac
 

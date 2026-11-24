@@ -9,6 +9,12 @@ The format follows Keep a Changelog; versions follow semantic versioning.
 - `ste` skill: house rules for Simplified Technical English; the docs, code-reviewer and session-reporter agents use it.
 - Cost routing: the orchestrator sends each stage to the cheapest tier that fits, escalates one tier on a weak result and never lowers a gate.
 - `crew run --tier fast|standard|deep` and an optional `tier:` key in the HANDOFF block.
+- GitHub Copilot target (`install.sh --target copilot`, also part of `all`): custom agents (`<name>.agent.md`), skills, entry prompts as `crew-<name>` skills and a managed block in `copilot-instructions.md`, under `$COPILOT_HOME` (default `~/.copilot`) or the project `.github/`.
+- `crew run --engine copilot`, `COPILOT_MODEL_FAST|STANDARD|DEEP` config keys and a `copilot` check in `crew doctor`.
+
+### Known limitations
+- Copilot CLI 1.0.99 was checked by hand with a separate `COPILOT_HOME`: it loads the rendered agents and `crew-<name>` skills, `--agent <name>` works, and `crew run --engine copilot` ran a worker (STATUS PASS, tests green) and a read-only gate (VERDICT, no file written). Not yet checked: whether text typed after `/crew-<name>` reaches the skill, and the Copilot app.
+- The manifest tracks one global Copilot home; installing again with another `COPILOT_HOME` removes the files from the old home.
 
 ### Fixed
 - `ac-checker`: proves a merge in another repository with `origin/main`, not with a working tree or `git branch --contains`.

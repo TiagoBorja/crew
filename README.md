@@ -3,13 +3,14 @@
 crew is a personal, project-agnostic multi-agent framework for AI coding
 tools. It ships 39 role-based agents, 18 skills and 6 entry prompts, written
 once as neutral markdown and rendered by `install.sh` into the native formats
-of Claude Code and Codex CLI. Any other tool that reads `AGENTS.md` can use the
+of Claude Code, Codex CLI and GitHub Copilot (Copilot CLI and the Copilot
+app). Any other tool that reads `AGENTS.md` can use the
 same roles inline. Agents are stack-neutral; project facts live in
 `.crew/context.md`.
 
 crew is not related to CrewAI.
 
-Status: 0.1.0. The Claude Code and Codex CLI integrations have not yet
+Status: 0.1.0. The Claude Code, Codex CLI and Copilot integrations have not yet
 been verified against the real tools (see `CHANGELOG.md`).
 
 ## Quick start
@@ -17,7 +18,7 @@ been verified against the real tools (see `CHANGELOG.md`).
 ```
 git clone <this repository> crew && cd crew
 ./install.sh --dry-run          # see what would happen, write nothing
-./install.sh --global           # install to ~/.crew, ~/.claude, ~/.codex
+./install.sh --global           # install to ~/.crew, ~/.claude, ~/.codex, ~/.copilot
 cd your-project
 /path/to/crew/install.sh --project   # optional: project-level install
 crew doctor                     # check installed files and tools
@@ -35,7 +36,7 @@ idempotent: the second run only reports `skip`.
 |---|---|
 | `--global` | Install to user-level paths (default). |
 | `--project [DIR]` | Install to project `DIR` (default: current directory). |
-| `--target T` | `claude`, `codex` or `all`. Default: `DEFAULT_TARGET` in `~/.crew/config`, else `all`. |
+| `--target T` | `claude`, `codex`, `copilot` or `all`. Default: `DEFAULT_TARGET` in `~/.crew/config`, else `all`. |
 | `--dry-run` | Print every planned action, write nothing. |
 | `--update` | Re-render; keep edited files; remove files that left the source. |
 | `--uninstall` | Remove crew files and managed blocks listed in the manifest. |
@@ -59,11 +60,16 @@ skills, prompts and profiles are global only):
 | crew home | `~/.crew/` (`AGENTS.md`, `guardrails.md`, `agents/`, `skills/`, `config`, `learnings.md`, `manifest.json`, `VERSION`) |
 | Claude Code | `~/.claude/agents/`, `~/.claude/skills/`, `~/.claude/commands/crew/`, managed block in `~/.claude/CLAUDE.md` |
 | Codex | managed block in `~/.codex/AGENTS.md`, `~/.codex/skills/`, `~/.codex/prompts/`, profiles in `~/.codex/config.toml` |
+| Copilot | `$COPILOT_HOME/agents/<name>.agent.md`, `$COPILOT_HOME/skills/` (skills and `crew-<prompt>` skills), managed block in `$COPILOT_HOME/copilot-instructions.md`. `COPILOT_HOME` defaults to `~/.copilot`; project scope uses `.github/` |
 | Project | `.crew/context.md` and `.crew/learnings.md` (created once, commit them) |
 
 The installer prints a hint to ignore the rendered `.claude/agents/`,
-`.claude/skills/`, `.claude/commands/crew/` and `.crew/agents/` in a project; it
+`.claude/skills/`, `.claude/commands/crew/` and `.crew/agents/` in a project,
+and says that `.github/agents/` and `.github/skills/` hold rendered files; it
 never edits your `.gitignore`.
+
+The manifest tracks one global Copilot home. If you install again with another
+`COPILOT_HOME`, crew removes its files from the old home.
 
 ## Usage
 
@@ -73,6 +79,27 @@ Agents are installed as subagents, so the main session (or the `orchestrator`)
 delegates to them natively with a HANDOFF block and can run independent work in
 parallel. Entry prompts are slash commands: `/crew:feature`, `/crew:bugfix`,
 `/crew:review`, `/crew:refactor`, `/crew:tdd`, `/crew:onboard`.
+
+### GitHub Copilot (Copilot CLI and the Copilot app)
+
+Agents are installed as custom agents: select one with `/agent` or
+`--agent <name>`, or ask the session to delegate to it by name. Skills load on
+demand. Entry prompts are skills named `crew-<name>` (`/crew-feature`,
+`/crew-bugfix`, ...), because Copilot CLI does not read `.prompt.md` files. The
+crew rules go in a managed block in `copilot-instructions.md`.
+
+To keep crew in a Copilot setup that is separate from your default one, point
+`COPILOT_HOME` at another directory for both the install and the session:
+
+```
+COPILOT_HOME=~/.copilot-personal ./install.sh --global --target copilot
+COPILOT_HOME=~/.copilot-personal copilot
+```
+
+Tool lists use the Copilot aliases (`read`, `search`, `edit`, `execute`, `web`,
+`agent`). An agent with MCP access and write access gets no `tools` line, so it
+can use all tools. `COPILOT_MODEL_*` empty means the agent uses the session
+model.
 
 ### Codex and other AGENTS.md-aware tools
 
@@ -87,7 +114,7 @@ parallel. Entry prompts are slash commands: `/crew:feature`, `/crew:bugfix`,
 ## The `crew` CLI
 
 ```
-crew run <agent> "<task>" [--tier fast|standard|deep] [--engine codex|claude] [--cwd DIR] [--dry-run]
+crew run <agent> "<task>" [--tier fast|standard|deep] [--engine codex|claude|copilot] [--cwd DIR] [--dry-run]
 crew list      agents with tier, gate and description
 crew doctor    installed files vs manifest, tools on PATH, versions
 crew version
@@ -98,6 +125,10 @@ crew help
 in `./.crew/agents` (or `--cwd`) first, then `~/.crew/agents`. The engine
 defaults to `RUN_ENGINE` in `~/.crew/config`. Exit codes of `crew run`: 0 pass,
 1 fail, 2 usage, 3 blocked, 4 no STATUS line, 127 engine missing.
+
+The `copilot` engine runs `copilot -s --no-ask-user --allow-all-tools -p
+<prompt>` and adds `--deny-tool shell` and `--deny-tool write` when the agent
+has no shell or no write access.
 
 `--tier` (or a `tier:` line in the HANDOFF) runs an agent on another tier than
 its default. Gate agents can be raised but never lowered.
@@ -209,7 +240,8 @@ Prompts:
 `~/.crew/config` is plain `KEY=VALUE` (never executed), created once and never
 overwritten. Keys: `CLAUDE_MODEL_FAST|STANDARD|DEEP` (defaults haiku, sonnet,
 opus), `CODEX_MODEL_FAST|STANDARD|DEEP` (empty: Codex default),
-`CODEX_EFFORT_FAST|STANDARD|DEEP` (low, medium, high), `DEFAULT_TARGET`
+`CODEX_EFFORT_FAST|STANDARD|DEEP` (low, medium, high),
+`COPILOT_MODEL_FAST|STANDARD|DEEP` (empty: session model), `DEFAULT_TARGET`
 (`all`) and `RUN_ENGINE` (`codex`). Edit it to override the tier mapping, then
 run `install.sh --update` to re-render.
 
@@ -257,7 +289,7 @@ The pre-commit hook runs the term scan on staged changes and the linter;
 the commit-msg hook scans the message. CI (`.github/workflows/ci.yml`) runs lint,
 check-terms, tests and shellcheck (when installed) on Linux and macOS.
 `tests/smoke.sh` runs a real `crew run` and only runs with `CREW_SMOKE=1` and
-`claude` or `codex` on `PATH`.
+`claude`, `codex` or `copilot` on `PATH`.
 
 `check-terms.sh` always checks for common secret patterns. To also block your
 own terms (client names, internal hosts), list them one per line in
@@ -277,7 +309,7 @@ are reported and kept. `config`, `learnings.md` and `context.md` are yours.
 ## Supported versions
 
 Version 0.1.0. The installer targets macOS and Linux (CI runs both) with POSIX
-`sh` and `awk`. Claude Code and Codex CLI versions are not pinned; the
+`sh` and `awk`. Claude Code, Codex CLI and Copilot CLI versions are not pinned; the
 integrations have not yet been verified against real releases.
 
 ## License

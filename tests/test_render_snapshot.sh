@@ -10,6 +10,7 @@ snap=$here/snapshots
 
 W=$(mktemp -d "${TMPDIR:-/tmp}/crew-t-snap.XXXXXX")
 trap 'rm -rf "$W"' EXIT
+unset COPILOT_HOME
 S=$W/src
 cp -R "$here/fixtures/good" "$S"
 echo 0.0.0-snapshot > "$S/VERSION"
@@ -68,6 +69,12 @@ if [ -d "$snap/global" ]; then
     # shellcheck disable=SC2016 # backticks are literal text in the expected output
     if has "$snap/global/.claude/commands/crew/sample-prompt.md" 'Act as the `alpha-worker` agent.' && has "$snap/global/.claude/commands/crew/sample-prompt.md" '^argument-hint: what to do$'; then ok "claude: prompt frontmatter and body"; else nok "claude: prompt frontmatter and body"; fi
     if has "$snap/global/.codex/config.toml" '^\[profiles.crew-readonly\]$' && has "$snap/global/.codex/config.toml" '^model_reasoning_effort = "high"$'; then ok "codex: profiles block"; else nok "codex: profiles block"; fi
+    copilot_alpha=$snap/global/.copilot/agents/alpha-worker.agent.md
+    copilot_beta=$snap/global/.copilot/agents/beta-gate.agent.md
+    if has "$copilot_alpha" '^tools: \["read", "search", "edit", "execute"\]$' && has "$copilot_beta" '^tools: \["read", "search"\]$'; then ok "copilot: capabilities map to tool aliases"; else nok "copilot: capabilities map to tool aliases"; fi
+    if ! has "$copilot_alpha" '^model:' && has "$copilot_beta" 'VERDICT: PASS|FAIL'; then ok "copilot: empty model omits the model line, contract appended"; else nok "copilot: empty model omits the model line, contract appended"; fi
+    copilot_prompt=$snap/global/.copilot/skills/crew-sample-prompt/SKILL.md
+    if has "$copilot_prompt" '^name: crew-sample-prompt$' && ! has "$copilot_prompt" 'ARGUMENTS'; then ok "copilot: prompt becomes a crew-<name> skill"; else nok "copilot: prompt becomes a crew-<name> skill"; fi
     if ! has "$snap/global/.codex/config.toml" '^model = '; then ok "codex: empty model omits the model line"; else nok "codex: empty model omits the model line"; fi
 fi
 

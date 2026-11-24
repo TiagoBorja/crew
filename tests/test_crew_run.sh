@@ -29,7 +29,7 @@ hasnt() { ! grep -q -- "$2" "$1"; }
 CREW_SRC=$S sh "$repo/install.sh" --global > "$W/inst.out" 2>&1 || { cat "$W/inst.out"; echo "Bail out! install failed"; exit 1; }
 
 # stub engines: record arguments and stdin, print $STUB_OUT
-for e in codex claude; do
+for e in codex claude copilot; do
     cat > "$W/stubs/$e" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$@" > "$STUB_LOG.args"
@@ -67,6 +67,14 @@ check "dry-run gate (claude): model and read-only tools" sh -c "grep -q '^model:
 check "dry-run gate (claude): no edit tools" hasnt "$W/out" 'Edit'
 run run alpha-worker "work" --engine claude --dry-run
 check "dry-run worker (claude): haiku and edit tools" sh -c "grep -q '^model: haiku\$' '$W/out' && grep -q -- '--allowedTools \"Read,Grep,Glob,Edit,Write,Bash\"' '$W/out'"
+
+run run beta-gate "review" --engine copilot --dry-run
+check "dry-run gate (copilot): silent, no shell, no writes, inherited model" sh -c "grep -q '^command: copilot -s --no-ask-user --allow-all-tools --deny-tool shell --deny-tool write -p <prompt>\$' '$W/out' && grep -q '^model: (inherited)\$' '$W/out'"
+run run alpha-worker "work" --engine copilot --dry-run
+check "dry-run worker (copilot): shell and writes allowed" has "$W/out" '^command: copilot -s --no-ask-user --allow-all-tools -p <prompt>$'
+printf 'COPILOT_MODEL_FAST=copilot-small\n' > "$HOME/.crew/config"
+run run alpha-worker "work" --engine copilot --dry-run
+check "config: Copilot model per tier" has "$W/out" '^command: copilot -s --no-ask-user --allow-all-tools --model copilot-small -p <prompt>$'
 
 printf 'CLAUDE_MODEL_FAST=my-small-model\nRUN_ENGINE=claude\n' > "$HOME/.crew/config"
 run run alpha-worker "work" --dry-run
@@ -160,6 +168,10 @@ say 'STATUS: PASS'
 run run alpha-worker "do it" --engine claude
 check "claude engine: STATUS PASS -> 0" test "$rc" = 0
 check "claude receives model, tools, system prompt and handoff" sh -c "grep -qx -- '-p' '$STUB_LOG.args' && grep -qx 'haiku' '$STUB_LOG.args' && grep -qx 'Read,Grep,Glob,Edit,Write,Bash' '$STUB_LOG.args' && grep -q 'Never print secrets' '$STUB_LOG.args' && grep -q 'objective: do it' '$STUB_LOG.args'"
+
+run run beta-gate "review it" --engine copilot
+check "copilot engine: gate without VERDICT -> 4" test "$rc" = 4
+check "copilot receives flags and the full prompt" sh -c "grep -qx -- '--deny-tool' '$STUB_LOG.args' && grep -qx -- '-p' '$STUB_LOG.args' && grep -q 'Never print secrets' '$STUB_LOG.args' && grep -q 'objective: review it' '$STUB_LOG.args'"
 
 # engine missing: only meaningful when the real CLI is not on the fallback PATH
 rm "$W/stubs/codex"
