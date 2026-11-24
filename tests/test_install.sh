@@ -11,6 +11,7 @@ W=$(mktemp -d "${TMPDIR:-/tmp}/crew-t-install.XXXXXX")
 trap 'rm -rf "$W"' EXIT
 export HOME="$W/home"
 mkdir -p "$HOME"
+unset COPILOT_HOME
 S=$W/src
 cp -R "$here/fixtures/good" "$S"
 echo 0.0.0-test > "$S/VERSION"
@@ -64,6 +65,10 @@ check "global install creates Claude files" has_all \
 check "global install creates Codex files" has_all \
     "$HOME/.codex/AGENTS.md" "$HOME/.codex/skills/sample-skill/SKILL.md" \
     "$HOME/.codex/prompts/sample-prompt.md" "$HOME/.codex/config.toml"
+check "global install creates Copilot files" has_all \
+    "$HOME/.copilot/agents/alpha-worker.agent.md" "$HOME/.copilot/agents/beta-gate.agent.md" \
+    "$HOME/.copilot/skills/sample-skill/SKILL.md" "$HOME/.copilot/skills/crew-sample-prompt/SKILL.md" \
+    "$HOME/.copilot/copilot-instructions.md"
 
 man=$HOME/.crew/manifest.json
 check "manifest has the expected envelope" sh -c "head -n 1 '$man' | grep -q '^{\"version\":\"0.0.0-test\",\"entries\":\[\$' && tail -n 1 '$man' | grep -q '^\]}\$'"
@@ -81,7 +86,7 @@ while IFS="$tab" read -r p s k; do
     fi
 done < "$W/entries"
 check "manifest entries match files on disk" test "$bad" = 0
-check "manifest has block entries for the three managed blocks" test "$(grep -c '"kind":"block"' "$man")" = 3
+check "manifest has block entries for the four managed blocks" test "$(grep -c '"kind":"block"' "$man")" = 4
 check "manifest has no entry for user-owned config" test "$(grep -c '/.crew/config"' "$man")" = 0
 
 # ---- idempotency ------------------------------------------------------------
@@ -114,8 +119,10 @@ check "deleted file is re-created" test "$rc" = 0 -a -f "$edited"
 # ---- managed blocks, user content, uninstall --------------------------------
 
 fresh_home
-mkdir -p "$HOME/.claude" "$HOME/.codex"
+mkdir -p "$HOME/.claude" "$HOME/.codex" "$HOME/.copilot"
 printf '# my notes\n\nkeep this line\n' > "$HOME/.claude/CLAUDE.md"
+printf 'my copilot rules\n' > "$HOME/.copilot/copilot-instructions.md"
+cp "$HOME/.copilot/copilot-instructions.md" "$W/o.copilot"
 printf 'plain agents text\n' > "$HOME/.codex/AGENTS.md"
 printf 'model = "x"\n\n[profiles.mine]\nmodel = "y"\n' > "$HOME/.codex/config.toml"
 cp "$HOME/.claude/CLAUDE.md" "$W/o.claude"
@@ -131,6 +138,7 @@ head_matches() { # original installed
 check "CLAUDE.md: user content before block is byte-identical" head_matches "$W/o.claude" "$HOME/.claude/CLAUDE.md"
 check "AGENTS.md: user content before block is byte-identical" head_matches "$W/o.agents" "$HOME/.codex/AGENTS.md"
 check "config.toml: user content before block is byte-identical" head_matches "$W/o.toml" "$HOME/.codex/config.toml"
+check "copilot-instructions.md: user content before block is byte-identical" head_matches "$W/o.copilot" "$HOME/.copilot/copilot-instructions.md"
 check "blocks are delimited by markers" sh -c "grep -c '^<!-- crew:begin -->\$' '$HOME/.claude/CLAUDE.md' | grep -q '^1\$' && grep -c '^# crew:end\$' '$HOME/.codex/config.toml' | grep -q '^1\$'"
 
 inst --uninstall --global
@@ -138,9 +146,10 @@ check "uninstall exits 0" test "$rc" = 0
 check "uninstall restores CLAUDE.md" same_file "$W/o.claude" "$HOME/.claude/CLAUDE.md"
 check "uninstall restores AGENTS.md" same_file "$W/o.agents" "$HOME/.codex/AGENTS.md"
 check "uninstall restores config.toml" same_file "$W/o.toml" "$HOME/.codex/config.toml"
+check "uninstall restores copilot-instructions.md" same_file "$W/o.copilot" "$HOME/.copilot/copilot-instructions.md"
 left=$(cd "$HOME" && find . -type f | LC_ALL=C sort | tr '\n' ' ')
-check "uninstall leaves only user files, config and learnings" test "$left" = "./.claude/CLAUDE.md ./.codex/AGENTS.md ./.codex/config.toml ./.crew/config ./.crew/learnings.md "
-check "uninstall removes the emptied directories" test ! -d "$HOME/.claude/agents" -a ! -d "$HOME/.codex/prompts"
+check "uninstall leaves only user files, config and learnings" test "$left" = "./.claude/CLAUDE.md ./.codex/AGENTS.md ./.codex/config.toml ./.copilot/copilot-instructions.md ./.crew/config ./.crew/learnings.md "
+check "uninstall removes the emptied directories" test ! -d "$HOME/.claude/agents" -a ! -d "$HOME/.codex/prompts" -a ! -d "$HOME/.copilot/agents"
 
 fresh_home
 inst --global
@@ -214,10 +223,36 @@ check "project codex: AGENTS.md block and .crew/agents" has_all "$P/AGENTS.md" "
 check "project codex: nothing written under ~/.codex" test ! -e "$HOME/.codex"
 check "project codex: agents carry the contract" grep -q 'STATUS: PASS|FAIL|BLOCKED' "$P/.crew/agents/alpha-worker.md"
 
+inst --project "$P" --target copilot
+check "project copilot: exit 0" test "$rc" = 0
+check "project copilot: agents, skills, prompt skills and instructions in .github" has_all \
+    "$P/.github/agents/alpha-worker.agent.md" "$P/.github/skills/sample-skill/SKILL.md" \
+    "$P/.github/skills/crew-sample-prompt/SKILL.md" "$P/.github/copilot-instructions.md"
+check "project copilot: nothing written under ~/.copilot" test ! -e "$HOME/.copilot"
+check "project copilot: hint about .github files" grep -q '\.github/agents/' "$W/err"
+
 inst --uninstall --project "$P"
 check "project uninstall: exit 0" test "$rc" = 0
-check "project uninstall: project files gone, project-owned files kept" sh -c "test ! -e '$P/.claude' && test ! -e '$P/CLAUDE.md' && test ! -e '$P/AGENTS.md' && test ! -e '$P/.crew/agents' && test -f '$P/.crew/context.md'"
+check "project uninstall: project files gone, project-owned files kept" sh -c "test ! -e '$P/.claude' && test ! -e '$P/CLAUDE.md' && test ! -e '$P/AGENTS.md' && test ! -e '$P/.github' && test ! -e '$P/.crew/agents' && test -f '$P/.crew/context.md'"
+
 check "project uninstall: shared crew home kept" test -f "$HOME/.crew/guardrails.md"
+
+# ---- COPILOT_HOME -----------------------------------------------------------
+
+fresh_home
+mkdir -p "$W/cph"
+export COPILOT_HOME="$W/cph/"
+inst --global --target copilot
+check "COPILOT_HOME: exit 0" test "$rc" = 0
+check "COPILOT_HOME: Copilot files go there" has_all \
+    "$W/cph/agents/alpha-worker.agent.md" "$W/cph/skills/crew-sample-prompt/SKILL.md" "$W/cph/copilot-instructions.md"
+check "COPILOT_HOME: nothing under ~/.copilot" test ! -e "$HOME/.copilot"
+inst --uninstall --global --target copilot
+check "COPILOT_HOME: uninstall removes the files" sh -c "test $rc = 0 && test ! -e '$W/cph/agents' && test ! -e '$W/cph/copilot-instructions.md'"
+COPILOT_HOME=relative/dir
+inst --global --target copilot
+unset COPILOT_HOME
+check "relative COPILOT_HOME: exit 2" test "$rc" = 2
 
 # ---- update removes files that left the source ------------------------------
 
@@ -269,12 +304,13 @@ check "update drops stale manifest entries" test "$(grep -c gamma-extra "$HOME/.
 
 fresh_home
 inst --global
-printf 'CLAUDE_MODEL_STANDARD=opus\nCODEX_MODEL_FAST=small-model\nMYSTERY=1\n' > "$HOME/.crew/config"
+printf 'CLAUDE_MODEL_STANDARD=opus\nCODEX_MODEL_FAST=small-model\nCOPILOT_MODEL_FAST=copilot-small\nMYSTERY=1\n' > "$HOME/.crew/config"
 cp "$HOME/.crew/config" "$W/config.mine"
 inst --global
 check "config is never overwritten" same_file "$W/config.mine" "$HOME/.crew/config"
 check "config: model override reaches Claude agents" grep -q '^model: opus$' "$HOME/.claude/agents/beta-gate.md"
 check "config: Codex model line appears when set" grep -q '^model = "small-model"$' "$HOME/.codex/config.toml"
+check "config: Copilot model line appears only when set" sh -c "grep -q '^model: copilot-small\$' '$HOME/.copilot/agents/alpha-worker.agent.md' && ! grep -q '^model:' '$HOME/.copilot/agents/beta-gate.agent.md'"
 check "config: unknown key warns, does not fail" sh -c "test $rc = 0 && grep -q 'unknown config key: MYSTERY' '$W/err'"
 printf 'DEFAULT_TARGET=codex\n' > "$HOME/.crew/config"
 rm -rf "$HOME/.claude"

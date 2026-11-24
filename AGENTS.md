@@ -1,6 +1,6 @@
 # crew
 
-crew is a roster of 39 role-based engineering agents, 18 skills and 6 entry prompts that work the same way in Claude Code and Codex. The agents split work into stages (analyse, plan, implement, review gates, docs, report) and hand tasks to each other with a fixed handoff block. The guardrails in `guardrails/` (installed as `~/.crew/guardrails.md`) apply to every agent and override everything else in this file.
+crew is a roster of 39 role-based engineering agents, 18 skills and 6 entry prompts that work the same way in Claude Code, Codex and GitHub Copilot. The agents split work into stages (analyse, plan, implement, review gates, docs, report) and hand tasks to each other with a fixed handoff block. The guardrails in `guardrails/` (installed as `~/.crew/guardrails.md`) apply to every agent and override everything else in this file.
 
 ## Rules
 
@@ -88,7 +88,7 @@ Tier is fast, standard or deep. Gate agents return a `VERDICT`. Agents marked `n
 | tdd-workflow | Red-green-refactor loop and what counts as proof. |
 | verification-loop | Ordered build, test, lint and run sequence to finish before reporting PASS. |
 
-Entry prompts: `bugfix`, `feature`, `onboard`, `refactor`, `review`, `tdd`. Claude Code exposes them as `/crew:<name>`; Codex installs them as prompts.
+Entry prompts: `bugfix`, `feature`, `onboard`, `refactor`, `review`, `tdd`. Claude Code exposes them as `/crew:<name>`; Codex installs them as prompts; Copilot installs them as skills named `crew-<name>`.
 
 ## Paths
 
@@ -97,12 +97,13 @@ After install (global scope; project scope uses the same layout under the projec
 - crew home: `~/.crew/` with `guardrails.md`, `AGENTS.md`, the manifest and `agents/<name>.md` for Codex roles.
 - Claude Code: `~/.claude/agents/<name>.md`, `~/.claude/skills/<name>/`, `~/.claude/commands/crew/<name>.md`, memory block in `~/.claude/CLAUDE.md`.
 - Codex: instructions block in `~/.codex/AGENTS.md`, skills in `~/.codex/skills/<name>/` where supported.
+- GitHub Copilot: `$COPILOT_HOME/agents/<name>.agent.md`, `$COPILOT_HOME/skills/<name>/`, instructions block in `$COPILOT_HOME/copilot-instructions.md` (`COPILOT_HOME` defaults to `~/.copilot`; project scope uses `.github/`).
 - Project context: `.crew/context.md` (commands, conventions, no-go areas). Read it before acting.
 - Learnings: `.crew/learnings.md` for the project, `~/.crew/learnings.md` for you. One line per entry, 200 entries at most, no secrets.
 - Sources in the crew clone: `guardrails/`, `agents/`, `skills/`, `prompts/`.
 
 ## How to delegate
 
-Inline mode (Codex or any single session): read `.crew/agents/<name>.md` (or `~/.crew/agents/<name>.md`), announce `ROLE: <name>`, perform that role to completion with its `STATUS` line, then switch to the next role. Work is sequential. In Claude Code the `orchestrator`, or the main session, delegates natively to the subagent in `.claude/agents/` with the HANDOFF block, and independent work may run in parallel.
+Inline mode (Codex or any single session): read `.crew/agents/<name>.md` (or `~/.crew/agents/<name>.md`), announce `ROLE: <name>`, perform that role to completion with its `STATUS` line, then switch to the next role. Work is sequential. In Claude Code the `orchestrator`, or the main session, delegates natively to the subagent in `.claude/agents/` with the HANDOFF block, and independent work may run in parallel. In GitHub Copilot, crew agents are custom agents: select one with `/agent` or delegate to it by name.
 
-Isolated mode: `crew run <agent> "<task>" [--engine codex|claude] [--cwd DIR] [--dry-run]` starts a fresh non-interactive session for one agent and returns its output. Use it for gate agents so the review is independent of the author's context. Exit codes: 0 pass, 1 fail, 2 usage, 3 blocked, 4 no STATUS line, 127 engine missing. Use `crew list` to see agents and `crew doctor` to check the install.
+Isolated mode: `crew run <agent> "<task>" [--engine codex|claude|copilot] [--cwd DIR] [--dry-run]` starts a fresh non-interactive session for one agent and returns its output. Use it for gate agents so the review is independent of the author's context. Exit codes: 0 pass, 1 fail, 2 usage, 3 blocked, 4 no STATUS line, 127 engine missing. Use `crew list` to see agents and `crew doctor` to check the install.

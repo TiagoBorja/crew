@@ -10,7 +10,11 @@ CODEX_MODEL_DEEP=
 CODEX_EFFORT_FAST=low
 CODEX_EFFORT_STANDARD=medium
 CODEX_EFFORT_DEEP=high
-# Which tools the installer targets by default: claude | codex | all
+# GitHub Copilot models per tier. Empty means: inherit the session model.
+COPILOT_MODEL_FAST=
+COPILOT_MODEL_STANDARD=
+COPILOT_MODEL_DEEP=
+# Which tools the installer targets by default: claude | codex | copilot | all
 DEFAULT_TARGET=all
-# Engine used by "crew run": codex | claude
+# Engine used by "crew run": codex | claude | copilot
 RUN_ENGINE=codex
